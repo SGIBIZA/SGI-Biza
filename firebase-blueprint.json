@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Colaborador da empresa",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "sector": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "total_appointments": { "type": "integer" },
+        "no_shows": { "type": "integer" },
+        "normal_cancellations": { "type": "integer" },
+        "late_cancellations": { "type": "integer" },
+        "rejections": { "type": "integer" },
+        "last_appointment_date": { "type": "string", "format": "date-time" },
+        "priority_score": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Agendamento de massoterapia",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time_slot": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "cancelled", "no-show", "completed"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "approved_by": { "type": "string" },
+        "cancelled_at": { "type": "string", "format": "date-time" },
+        "cancellation_type": { "type": "string", "enum": ["normal", "late"] },
+        "imported": { "type": "boolean" }
+      },
+      "required": ["user_id", "date", "time_slot", "status"]
+    },
+    "Waitlist": {
+      "title": "Waitlist",
+      "description": "Fila de espera para um dia específico",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "priority_score": { "type": "number" },
+        "joined_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "date", "priority_score", "joined_at"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Configurações do sistema",
+      "type": "object",
+      "properties": {
+        "service_day": { "type": "integer", "description": "0-6 (Sunday-Saturday)" },
+        "release_time": { "type": "string", "description": "HH:mm" },
+        "open_day_before": { "type": "boolean" },
+        "max_appointments_per_period": { "type": "integer" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Dados do colaborador"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Agendamentos"
+    },
+    "/waitlist/{waitlistId}": {
+      "schema": "Waitlist",
+      "description": "Fila de espera"
+    },
+    "/settings/config": {
+      "schema": "Settings",
+      "description": "Configurações globais"
+    }
+  }
+}

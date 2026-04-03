@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - sector: string (optional)
+    //   - role: string (required, 'admin' | 'user')
+    //   - total_appointments: number
+    //   - no_shows: number
+    //   - normal_cancellations: number
+    //   - late_cancellations: number
+    //   - priority_score: number
+    //
+    // Collection: appointments
+    // Document ID: appointmentId
+    // Fields:
+    //   - user_id: string (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - time_slot: string (required, HH:mm)
+    //   - status: string (required, 'pending' | 'approved' | 'rejected' | 'cancelled' | 'no-show' | 'completed')
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (request.auth.token.email == "ghtbizasgi@gmail.com") ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
+    }
+
+    function isBootstrapAdmin() {
+      return isAuthenticated() && request.auth.token.email == "ghtbizasgi@gmail.com";
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'user'];
+    }
+
+    function isValidAppointment(data) {
+      return data.user_id is string &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.time_slot is string && data.time_slot.matches("^\\d{2}:\\d{2}$") &&
+             data.status in ['pending', 'approved', 'rejected', 'cancelled', 'no-show', 'completed'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && 
+        (request.resource.data.role == 'user' || (request.resource.data.role == 'admin' && isBootstrapAdmin()));
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) ||
+        isAdmin()
+      );
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id && isValidAppointment(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == resource.data.user_id && isValidAppointment(request.resource.data) && 
+         (request.resource.data.status == 'cancelled' || request.resource.data.status == resource.data.status)) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /waitlist/{waitlistId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.user_id || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.user_id || isAdmin());
+    }
+
+    match /settings/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
